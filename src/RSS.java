@@ -13,12 +13,18 @@ private String request;
 private String status;
 private String reason;
 private String clientIp;
+private int serverSocket;
+
 public RSS(String n, int s, int nu, InetAddress ip, String r){
 	name = n;
 	socket = s;
 	orderNum = nu;
 	IpAddress = ip;
 	request = r;
+}
+
+public RSS(int ss) {
+	serverSocket = ss;
 }
 
 String gettClienName(){
@@ -48,18 +54,31 @@ String getRequest(){
 int gettClientSocket(){
 	return socket;
 }
+
+void setServerSocket(int ss) {
+	this.serverSocket = ss;
+}
+
+int getServerSocket() {
+	return serverSocket;
+}
+
 int getOrderNumber(){
 	return orderNum;
 }
+
 InetAddress gettClientIp(){
 	return IpAddress;
 }
+
 void checkData() {
 	System.out.println( " Client name is " + name + " Socket number " + socket + " Order Num" + orderNum +" IP " + IpAddress);
 }
+
 private void writeObject(ObjectOutputStream out) throws IOException  
 {    out.defaultWriteObject();  }
   private void readObject(ObjectInputStream in)
                throws IOException, ClassNotFoundException  
 {    in.defaultReadObject();  }
+
 }

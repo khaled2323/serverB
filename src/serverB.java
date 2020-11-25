@@ -4,22 +4,22 @@ import java.io.IOException;
 import java.io.ObjectInputStream;
 import java.io.ObjectOutput;
 import java.io.ObjectOutputStream;
-import java.net.DatagramPacket;
-import java.net.DatagramSocket;
-import java.net.InetAddress;
-import java.net.SocketException;
-import java.util.ArrayList;
-import java.util.HashMap;
+import java.lang.reflect.Array;
+import java.net.*;
+import java.util.*;
+import java.util.concurrent.ExecutorService;
+import java.util.concurrent.Executors;
 
 public class serverB {
 	static HashMap<String, ArrayList<String>> storage = new HashMap<String, ArrayList<String>>();
+
 	public static StringBuilder data(byte[] a) {
 		// TODO Auto-generated method stub
 		if(a == null)
 			return null;
 		StringBuilder ret = new StringBuilder();
 		int i = 0;
-		
+
 		while(a[i] != 0) {
 			ret.append((char) a[i]);
 			i++;
@@ -27,123 +27,116 @@ public class serverB {
 		return ret;
 	}
 
-	
-	public static void sendUDP(ByteArrayOutputStream b, RSS s,DatagramSocket ds,InetAddress ip  ) {
-		try    
-		{      
-		ObjectOutput oo = new ObjectOutputStream(b); 
-		oo.writeObject(s);
-		oo.close();
-		byte[] serializedMessage = b.toByteArray();
-		System.out.println("Sending BACK : " + s.gettClientSocket());
-		DatagramPacket dpSend = new DatagramPacket(serializedMessage, serializedMessage.length,ip,s.gettClientSocket());
-			ds.send(dpSend);
-		    }
-		    catch (IOException ex)
-		    {ex.printStackTrace(); }
-	}
-	
-	public static void main(String [] args) throws IOException {
-		DatagramSocket ds = new DatagramSocket(3051);
+	public static void main(String [] args) throws IOException, InterruptedException, ClassNotFoundException {
+		int serverSocket = 3051;
+		DatagramSocket ds = new DatagramSocket(serverSocket);
 		byte[] receive = new byte[65535];
 		DatagramPacket DpReceive = null;
 		InetAddress ip = InetAddress.getLocalHost();
+		Object inputObject;
+		int serverASocket = 3050;
 		//InetAddress ip = InetAddress.getByName("8.8.8.8");
-		RSS clientR = null;
-		
-		while(true) {
-			System.out.println("\nServer Listening to Client: " + ip.toString() + ":" + ds.getPort());
 
-			DpReceive = new DatagramPacket(receive, receive.length);
-			
-			ds.receive(DpReceive);
-			
-			ObjectInputStream iStream = new ObjectInputStream(new ByteArrayInputStream(receive));
-	
-			try {
-				clientR = (RSS) iStream.readObject();
-				
-			} catch (ClassNotFoundException e) {
-				// TODO Auto-generated catch block
-				e.printStackTrace();
-			} catch (IOException e) {
-				// TODO Auto-generated catch block
-				e.printStackTrace();
-			}
-			iStream.close();
-			System.out.println("Client Name: " + clientR.gettClienName());
-			System.out.println("Client Request: " + clientR.getRequest());
-			System.out.println("Order # : " + clientR.getOrderNumber());
-			System.out.println("Client IP: " + clientR.getClientSimulationIp());
-			System.out.println("Client Socket Number: " + clientR.gettClientSocket());
-			String Key;
-			String data;
-			Key = clientR.gettClienName();
-			data = clientR.getRequest() + " "+clientR.getOrderNumber()+ " "+clientR.getClientSimulationIp()+ " "+clientR.gettClientSocket();
-			ArrayList<String> b = new ArrayList<String>();
-			if(clientR.getRequest().equals("REGISTER")) {
-				// TODO create condition to check registration success
-				if(storage.containsKey(Key)== false) {
-					
-					System.out.println("A Register request is made by "+ clientR.gettClienName());
-					// save data
-					b.add(data);
-					storage.put(Key,b); // add to hashmap
-					b = null; // to be used to point to other places in hashmap arrayList
-					// send back confirmation
-					System.out.println("Registration accepted");
-					clientR.setClientStatus("REGISTERED");
-					System.out.println(" ");
-					System.out.println("*****************************************************");
-					System.out.println("   STORAGE CONTENT   ");
-					System.out.println(storage);
-					ByteArrayOutputStream bStream = new ByteArrayOutputStream();
-					sendUDP(bStream,clientR,ds,ip);
+		ClientHandler clientHandler = new ClientHandler(ds);
+
+		while (true) {
+			System.out.println("[SERVER] Waiting for a client connection...");
+
+			// waiting for Server A to stop serving, and to receive Server A's storage
+			while (true) {
+				DpReceive = new DatagramPacket(receive, receive.length);
+
+				ds.receive(DpReceive);
+
+				ObjectInputStream iStream = new ObjectInputStream(new ByteArrayInputStream(receive));
+
+				inputObject = iStream.readObject();
+				if (inputObject instanceof HashMap) {
+					System.out.println("Storage from Server A:\n" + inputObject); // used for testing
+					storage = (HashMap) inputObject;
+					break;
 				}
-				else if(storage.containsKey(Key)== true) {
-					//System.out.println( " status currently " + clientR.getClientStatus());
-				clientR.setClientStatus("REGISTER-DENIED");
-				clientR.setReason("User Already Registered");
-				System.out.println("REGISTER-DENIED");
-				ByteArrayOutputStream bStream = new ByteArrayOutputStream();
-				sendUDP(bStream,clientR,ds,ip);
+			} // end of while loop
+
+			ServerTimer serverTimer = new ServerTimer(ds);
+			Timer timer = new Timer();
+			// timer starts
+			System.out.println("Server started serving at: " + new Date());
+			timer.schedule(serverTimer, 0);
+
+			// timer ends
+			Thread.sleep(20000); // 5min = 300,000ms
+			System.out.println("\nServer stopped serving at: " + new Date());
+			String status = "This server is no longer serving, the other server must take over.\n";
+			System.out.println(status + "   Storage Content:   \n" + clientHandler.storage);
+
+			// sends Server B's storage to Server A
+			ByteArrayOutputStream bStream = new ByteArrayOutputStream();
+			ObjectOutput objectOutput = new ObjectOutputStream(bStream);
+			objectOutput.writeObject(clientHandler.storage);
+			objectOutput.close();
+
+			byte[] serializedMessage = bStream.toByteArray();
+
+			DatagramPacket dpSend = new DatagramPacket(serializedMessage, serializedMessage.length, ip, serverASocket);
+			ds.send(dpSend);
+
+			// send Server A's socket and ip to all the clients
+			RSS serverA = new RSS(serverASocket);
+			serverA.setClientStatus("CHANGE-SERVER");
+
+			bStream = new ByteArrayOutputStream();
+			objectOutput = new ObjectOutputStream(bStream);
+			objectOutput.writeObject(serverA);
+			objectOutput.close();
+
+			serializedMessage = bStream.toByteArray();
+
+			String string;
+			String clientSocket = null;
+			String clientIP = null;
+
+			for (Map.Entry<String, ArrayList<String>> clientInfo : clientHandler.storage.entrySet()) {
+				ArrayList<String> currentList = clientInfo.getValue();
+
+				// iterate on the current list
+				for (int j = 0; j < currentList.size(); j++) {
+					string = currentList.get(0);
+					String[] splitInfo = string.split(" ");
+					clientIP = splitInfo[2];
+					clientSocket = splitInfo[3];
 				}
+				dpSend = new DatagramPacket(serializedMessage, serializedMessage.length, ip, Integer.parseInt(clientSocket));
+				ds.send(dpSend);
 			}
-			else if(clientR.getRequest().equals("DE-REGISTER")) {
-				if(storage.containsKey(Key)== true) { //if user data exists
-					storage.remove(Key); //delete from hashmap
-					clientR.setClientStatus("DE-REGISTERED"); //set status as de-register
-					System.out.println("de-Registration accepted");
-					ByteArrayOutputStream bStream = new ByteArrayOutputStream(); //sendback class info to user
-					sendUDP(bStream,clientR,ds,ip);
-				}else {
-					// nothing happens just send back the class info
-					clientR.setClientStatus(null);
-					System.out.println("Registration rejected, User was not registered at this moment");
-					ByteArrayOutputStream bStream = new ByteArrayOutputStream(); //sendback class info to user
-					sendUDP(bStream,clientR,ds,ip);
-				}
-			}else if(clientR.getRequest().equals("UPDATE")) {
-				if(storage.containsKey(Key)== true) {
-					storage.get(Key);
-					b.add(data);
-					storage.put(Key,b); // add to hashmap
-					b = null; // to be used to point to other places in hashmap arrayList
-					System.out.println(storage);
-					System.out.println("Update done ");
-					clientR.setClientStatus("UPDATE-CONFIRMED"); //set status as de-register
-					ByteArrayOutputStream bStream = new ByteArrayOutputStream(); //sendback class info to user
-					sendUDP(bStream,clientR,ds,ip);
-				}
-			}
-			if(data(receive).toString().equals("EXIT")) {
-				System.out.println("Client sent exit... exiting");
-				break;
-			}
-			
-			//receive = new byte[65535];
 		}
+	} // end of main
+} // end of class ServerA
+
+class ServerTimer extends TimerTask {
+	DatagramSocket datagramSocket = null;
+	private static ArrayList<ClientHandler> clients = new ArrayList<>();
+	private static ExecutorService pool = Executors.newFixedThreadPool(4); // can increase this # depending on # of clients
+
+	public ServerTimer(DatagramSocket ds) {
+		this.datagramSocket = ds;
 	}
 
-	
-}
+	@Override
+	public void run() {
+		//randomTime = r.nextInt(20000);
+
+		// create ClientHandler threads to handle each client
+		//while (true) {
+		ClientHandler clientThread = null;
+		try {
+			clientThread = new ClientHandler(datagramSocket);
+		} catch (IOException e) {
+			e.printStackTrace();
+		}
+		clients.add(clientThread);
+		pool.execute(clientThread);
+		//} // end of while loop
+	}
+} // end of class serverTimer
+
