@@ -35,6 +35,8 @@ public class serverB {
 		InetAddress ip = InetAddress.getLocalHost();
 		Object inputObject;
 		int serverASocket = 3050;
+		String key;
+		String data;
 		//InetAddress ip = InetAddress.getByName("8.8.8.8");
 
 		ClientHandler clientHandler = new ClientHandler(ds);
@@ -53,7 +55,14 @@ public class serverB {
 				inputObject = iStream.readObject();
 				if (inputObject instanceof HashMap) {
 					System.out.println("Storage from Server A:\n" + inputObject); // used for testing
-					storage = (HashMap) inputObject;
+
+					// TESTING - add contents from Server A's storage to Server B's storage
+					for (Map.Entry<String, ArrayList<String>> clientInfo : ((HashMap<String, ArrayList<String>>) inputObject).entrySet()) {
+						key = clientInfo.getKey();
+						ArrayList<String> currentListData = clientInfo.getValue();
+						storage.put(key, currentListData);
+						System.out.println("TEST - storage from Server A: " + storage);
+					}
 					break;
 				}
 			} // end of while loop

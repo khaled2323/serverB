@@ -10,13 +10,9 @@ public class ClientHandler implements Runnable {
 	private DatagramSocket ds;
 	private BufferedReader in;
 	private PrintWriter out;
-	Object inputObject;
 	static HashMap<String, ArrayList<String>> storage = new HashMap<String, ArrayList<String>>();
 
-	String requestType;
 	RSS clientR;
-	String input;
-
 	byte[] receive = new byte[65535];
 	DatagramPacket DpReceive = null;
 	InetAddress ip = InetAddress.getLocalHost();
@@ -24,7 +20,6 @@ public class ClientHandler implements Runnable {
 
 	public ClientHandler(DatagramSocket clientSocket) throws IOException {
         this.ds = clientSocket;
-		//clientR.getRequest();
     } // end of ClientHandler
 
 	@Override
@@ -38,14 +33,7 @@ public class ClientHandler implements Runnable {
 				ObjectInputStream iStream = new ObjectInputStream(new ByteArrayInputStream(receive));
 
 				try {
-					inputObject = iStream.readObject();
-					if (inputObject instanceof HashMap) {
-						System.out.println("Storage from Server A:\n" + inputObject); // used for testing
-						storage = (HashMap) inputObject;
-						break;
-					}
-					else if (inputObject instanceof RSS)
-						clientR = (RSS) iStream.readObject();
+					clientR = (RSS) iStream.readObject();
 
 				} catch (ClassNotFoundException e) {
 					// TODO Auto-generated catch block
