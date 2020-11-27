@@ -77,12 +77,12 @@ public class serverB {
 			Thread.sleep(20000); // 5min = 300,000ms
 			System.out.println("\nServer stopped serving at: " + new Date());
 			String status = "This server is no longer serving, the other server must take over.\n";
-			System.out.println(status + "   Storage Content:   \n" + clientHandler.storage);
+			System.out.println(status + "   Storage Content:   \n" + storage);
 
 			// sends Server B's storage to Server A
 			ByteArrayOutputStream bStream = new ByteArrayOutputStream();
 			ObjectOutput objectOutput = new ObjectOutputStream(bStream);
-			objectOutput.writeObject(clientHandler.storage);
+			objectOutput.writeObject(storage);
 			objectOutput.close();
 
 			byte[] serializedMessage = bStream.toByteArray();

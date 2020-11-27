@@ -56,7 +56,7 @@ int gettClientSocket(){
 }
 
 void setServerSocket(int ss) {
-	this.serverSocket = ss;
+	serverSocket = ss;
 }
 
 int getServerSocket() {
