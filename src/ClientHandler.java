@@ -1,15 +1,13 @@
 import java.io.*;
-import java.net.DatagramPacket;
-import java.net.DatagramSocket;
-import java.net.InetAddress;
-import java.net.Socket;
+import java.net.*;
 import java.util.ArrayList;
 import java.util.HashMap;
+import java.util.concurrent.Callable;
 
 public class ClientHandler implements Runnable {
 	private DatagramSocket ds;
-	private BufferedReader in;
-	private PrintWriter out;
+	private int serverASocket = 3050;
+	private boolean isServing = false;
 	static HashMap<String, ArrayList<String>> storage = new HashMap<String, ArrayList<String>>();
 
 	RSS clientR;
@@ -18,9 +16,14 @@ public class ClientHandler implements Runnable {
 	InetAddress ip = InetAddress.getLocalHost();
 	//InetAddress ip = InetAddress.getByName("8.8.8.8");
 
-	public ClientHandler(DatagramSocket clientSocket) throws IOException {
+	public ClientHandler(DatagramSocket clientSocket, int serverASocket) throws IOException {
         this.ds = clientSocket;
-    } // end of ClientHandler
+        this.serverASocket = serverASocket;
+    }
+
+	public boolean getIsServing() {
+		return this.isServing;
+	}
 
 	@Override
     public void run() {
@@ -42,12 +45,19 @@ public class ClientHandler implements Runnable {
 					// TODO Auto-generated catch block
 					e.printStackTrace();
 				}
+				iStream.close();
+
+				if (clientR.getClientStatus() != null && clientR.getClientStatus().equals("CHANGE-SERVER")) {
+					isServing = true;
+					break;
+				}
 
 				// print which client the server thread is listening to
-				System.out.println("\nServer Listening to Client: " + clientR.getClientSimulationIp() + ":" + clientR.gettClientSocket());
+				if (clientR.from().equals("CLIENT")) {
+					System.out.println("\nServer Listening to Client: " + clientR.getClientSimulationIp() + ":" + clientR.gettClientSocket());
+				}
 
-				iStream.close();
-				System.out.println("Client Name: " + clientR.gettClienName());
+				System.out.println("\nClient Name: " + clientR.gettClienName());
 				System.out.println("Client Request: " + clientR.getRequest());
 				System.out.println("Order #: " + clientR.getOrderNumber());
 				System.out.println("Client IP: " + clientR.getClientSimulationIp());
@@ -73,8 +83,17 @@ public class ClientHandler implements Runnable {
 						System.out.println("*****************************************************");
 						System.out.println("   STORAGE CONTENT   ");
 						System.out.println(storage);
-						ByteArrayOutputStream bStream = new ByteArrayOutputStream();
-						sendUDP(bStream, clientR, ds, ip);
+
+						// sends to other server
+						if (clientR.from().equals("CLIENT")) {
+							clientR.setFrom("SERVER");
+							clientR.setServerSocket(serverASocket);
+							ByteArrayOutputStream bStream = new ByteArrayOutputStream();
+							ByteArrayOutputStream bStream2 = new ByteArrayOutputStream();
+							sendUDP(bStream, clientR, ds, ip);
+							sendUDPToServer(bStream2, clientR, ds, ip);
+							}
+						}
 					} else if (storage.containsKey(Key) == true) {
 						//System.out.println( " status currently " + clientR.getClientStatus());
 						clientR.setClientStatus("REGISTER-DENIED");
@@ -82,24 +101,50 @@ public class ClientHandler implements Runnable {
 						System.out.println("REGISTER-DENIED");
 						ByteArrayOutputStream bStream = new ByteArrayOutputStream();
 						sendUDP(bStream, clientR, ds, ip);
+
+					if (clientR.from().equals("CLIENT")) {
+						clientR.setFrom("SERVER");
+						clientR.setServerSocket(serverASocket);
+						ByteArrayOutputStream bStream2 = new ByteArrayOutputStream();
+						sendUDPToServer(bStream2, clientR, ds, ip);
+						}
 					}
-				} else if (clientR.getRequest().equals("DE-REGISTER")) {
+
+				else if (clientR.getRequest().equals("DE-REGISTER")) {
 					if (storage.containsKey(Key) == true) { //if user data exists
 						storage.remove(Key); //delete from hashmap
 						clientR.setClientStatus("DE-REGISTERED"); //set status as de-register
 						System.out.println("De-Registration accepted");
 						System.out.println("   STORAGE CONTENT   ");
 						System.out.println(storage);
-						ByteArrayOutputStream bStream = new ByteArrayOutputStream(); //sendback class info to user
-						sendUDP(bStream, clientR, ds, ip);
+
+						// sends to other server
+						if (clientR.from().equals("CLIENT")) {
+							clientR.setFrom("SERVER");
+							clientR.setServerSocket(serverASocket);
+							ByteArrayOutputStream bStream = new ByteArrayOutputStream(); //sendback class info to user
+							ByteArrayOutputStream bStream2 = new ByteArrayOutputStream();
+							sendUDP(bStream, clientR, ds, ip);
+							sendUDPToServer(bStream2, clientR, ds, ip);
+						}
 					} else {
 						// nothing happens just send back the class info
 						clientR.setClientStatus(null);
 						System.out.println("De-Registration rejected, User was not registered at this moment");
-						ByteArrayOutputStream bStream = new ByteArrayOutputStream(); //sendback class info to user
-						sendUDP(bStream, clientR, ds, ip);
+
+						// sends to other server
+						if (clientR.from().equals("CLIENT")) {
+							clientR.setFrom("SERVER");
+							clientR.setServerSocket(serverASocket);
+							ByteArrayOutputStream bStream = new ByteArrayOutputStream(); //sendback class info to user
+							ByteArrayOutputStream bStream2 = new ByteArrayOutputStream();
+							sendUDP(bStream, clientR, ds, ip);
+							sendUDPToServer(bStream2, clientR, ds, ip);
+						}
 					}
-				} else if (clientR.getRequest().equals("UPDATE")) {
+				}
+
+				else if (clientR.getRequest().equals("UPDATE")) {
 					if (storage.containsKey(Key) == true) {
 						storage.get(Key);
 						b.add(data);
@@ -110,8 +155,16 @@ public class ClientHandler implements Runnable {
 						clientR.setClientStatus("UPDATE-CONFIRMED"); //set status as de-register
 						System.out.println("   STORAGE CONTENT   ");
 						System.out.println(storage);
-						ByteArrayOutputStream bStream = new ByteArrayOutputStream(); //sendback class info to user
-						sendUDP(bStream, clientR, ds, ip);
+
+						// sends to other server
+						if (clientR.from().equals("CLIENT")) {
+							clientR.setFrom("SERVER");
+							clientR.setServerSocket(serverASocket);
+							ByteArrayOutputStream bStream = new ByteArrayOutputStream(); //sendback class info to user
+							ByteArrayOutputStream bStream2 = new ByteArrayOutputStream();
+							sendUDP(bStream, clientR, ds, ip);
+							sendUDPToServer(bStream2, clientR, ds, ip);
+						}
 					} else {
 						System.out.println("Update denied: Name does not exist");
 						clientR.setClientStatus("UPDATE-DENIED");
@@ -144,11 +197,11 @@ public class ClientHandler implements Runnable {
 					break;
 				}
 			}
-		} catch	(IOException e) {
+	} catch	(IOException e) {
 			System.err.println("IO exception in Client Handler");
 			System.err.println(e.getStackTrace());
 		}
-    } // end of run
+    } // end of call
 
 	public static void sendUDP(ByteArrayOutputStream b, RSS s, DatagramSocket ds, InetAddress ip) {
 		try
@@ -157,11 +210,26 @@ public class ClientHandler implements Runnable {
 			oo.writeObject(s);
 			oo.close();
 			byte[] serializedMessage = b.toByteArray();
-			System.out.println("Sending BACK : " + s.gettClientSocket());
-			DatagramPacket dpSend = new DatagramPacket(serializedMessage, serializedMessage.length,ip,s.gettClientSocket());
+			System.out.println("Sending BACK: " + s.gettClientSocket());
+			DatagramPacket dpSend = new DatagramPacket(serializedMessage, serializedMessage.length, ip, s.gettClientSocket());
 			ds.send(dpSend);
 		}
 		catch (IOException ex)
 		{ex.printStackTrace(); }
 	} // end of sendUDP
+
+	public static void sendUDPToServer(ByteArrayOutputStream b, RSS s, DatagramSocket ds, InetAddress ip) {
+		try
+		{
+			ObjectOutput oo = new ObjectOutputStream(b);
+			oo.writeObject(s);
+			oo.close();
+			byte[] serializedMessage = b.toByteArray();
+			System.out.println("Sending to other Server: " + s.getServerSocket());
+			DatagramPacket dpSend = new DatagramPacket(serializedMessage, serializedMessage.length, ip, s.getServerSocket());
+			ds.send(dpSend);
+		}
+		catch (IOException ex)
+		{ex.printStackTrace(); }
+	} // end of sendUDPToServer method
 } // end of class ClientHandler

@@ -14,6 +14,7 @@ private String status;
 private String reason;
 private String clientIp;
 private int serverSocket;
+private String sentFrom;
 
 public RSS(String n, int s, int nu, InetAddress ip, String r){
 	name = n;
@@ -69,6 +70,14 @@ int getOrderNumber(){
 
 InetAddress gettClientIp(){
 	return IpAddress;
+}
+
+void setFrom(String from) {
+	this.sentFrom = from;
+}
+
+String from() {
+	return sentFrom;
 }
 
 void checkData() {
