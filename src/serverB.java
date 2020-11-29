@@ -64,7 +64,7 @@ public class serverB {
 			timer.schedule(serverTimer, 0);
 
 			// timer ends
-			Thread.sleep(20000); // 5min = 300,000ms
+			Thread.sleep(90000); // 5min = 300,000ms
 			timer.cancel();
 			System.out.println("\nServer stopped serving at: " + new Date());
 			String status = "This server is no longer serving, the other server must take over.\n";
