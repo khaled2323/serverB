@@ -60,7 +60,7 @@ public class serverB {
 			ServerTimer serverTimer = new ServerTimer(ds, serverASocket);
 			Timer timer = new Timer();
 			// timer starts
-			System.out.println("Server started serving at: " + new Date());
+			System.out.println("\nServer started serving at: " + new Date());
 			timer.schedule(serverTimer, 0);
 
 			// timer ends
